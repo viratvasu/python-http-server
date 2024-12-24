@@ -2,33 +2,39 @@ import threading
 import socket
 import sys
 
-
 def handle_request(client_socket, client_address):
     print(f"Connection received from {client_address}")
+    
     # Read the request from the client
     request = client_socket.recv(4096).decode("utf-8")
     lines = request.split("\r\n")
     
-    # Parse the request
-    method, target, _ = lines[0].split(" ")
+    # First line should contain the request method and target
+    request_line = lines[0]
+    try:
+        method, target, _ = request_line.split(" ")
+    except ValueError:
+        # In case the request line doesn't have the expected format
+        client_socket.sendall(b"HTTP/1.1 400 Bad Request\r\n\r\n")
+        return
     
-    # Extract headers
+    # Extract headers (skip the empty lines at the end)
     headers = {}
-    for line in lines[1:]:
-        if line:
-            key, value = line.split(": ", 1)
+    i = 1
+    while i < len(lines) and lines[i].strip() != "":
+        try:
+            key, value = lines[i].split(": ", 1)
             headers[key] = value
-    
-    response = None
-    body = ""
-    
-    # Handle GET and POST requests
+        except ValueError:
+            # Skip invalid headers
+            pass
+        i += 1
+
+    # Handling different types of requests
     if method == "GET":
-        # Process GET method
         if target == "/":
             response = b"HTTP/1.1 200 OK\r\n\r\n"
         elif target.startswith("/files/"):
-            # Handle files directory for GET
             directory = sys.argv[2]
             filename = target[7:]
             try:
@@ -41,27 +47,31 @@ def handle_request(client_socket, client_address):
             response = b"HTTP/1.1 404 Not Found\r\n\r\n"
 
     elif method == "POST" and target.startswith("/files/"):
-        # Process POST method for /files/{filename}
+        # Handle POST method for /files/{filename}
         directory = sys.argv[2]
         filename = target.split("/files/")[1]
         content_length = int(headers.get("Content-Length", 0))
 
-        # Read the request body from the socket based on the Content-Length header
-        body = client_socket.recv(content_length).decode("utf-8")
-        
-        # Write the body to a new file
-        try:
-            with open(f"{directory}/{filename}", "w") as f:
-                f.write(body)
+        if content_length > 0:
+            # Read the request body
+            body = client_socket.recv(content_length).decode("utf-8")
             
-            # Respond with HTTP 201 Created
-            response = b"HTTP/1.1 201 Created\r\n\r\n"
-        except Exception as e:
-            response = b"HTTP/1.1 500 Internal Server Error\r\n\r\n"
-    
+            try:
+                with open(f"{directory}/{filename}", "w") as f:
+                    f.write(body)
+
+                # Respond with HTTP 201 Created
+                response = b"HTTP/1.1 201 Created\r\n\r\n"
+            except Exception:
+                response = b"HTTP/1.1 500 Internal Server Error\r\n\r\n"
+        else:
+            response = b"HTTP/1.1 400 Bad Request\r\n\r\n"
+
+    else:
+        response = b"HTTP/1.1 404 Not Found\r\n\r\n"
+
     # Send the response back to the client
-    if response:
-        client_socket.sendall(response)
+    client_socket.sendall(response)
 
 
 def main():
