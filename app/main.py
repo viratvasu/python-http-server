@@ -7,6 +7,8 @@ def handle_request(client_socket, client_address):
     
     # Read the request from the client
     request = client_socket.recv(4096).decode("utf-8")
+    print(f"Request received: {request}")
+
     lines = request.split("\r\n")
     
     # First line should contain the request method and target
@@ -14,7 +16,7 @@ def handle_request(client_socket, client_address):
     try:
         method, target, _ = request_line.split(" ")
     except ValueError:
-        # In case the request line doesn't have the expected format
+        print("Error parsing the request line")
         response = b"HTTP/1.1 400 Bad Request\r\n\r\n"
         client_socket.sendall(response)
         client_socket.close()
@@ -32,6 +34,9 @@ def handle_request(client_socket, client_address):
             pass
         i += 1
 
+    print(f"Method: {method}, Target: {target}")
+    print(f"Headers: {headers}")
+    
     # Handling different types of requests
     if method == "GET":
         if target == "/":
@@ -47,7 +52,6 @@ def handle_request(client_socket, client_address):
                 response = b"HTTP/1.1 404 Not Found\r\n\r\n"
         else:
             response = b"HTTP/1.1 404 Not Found\r\n\r\n"
-
     elif method == "POST" and target.startswith("/files/"):
         # Handle POST method for /files/{filename}
         directory = sys.argv[2]
@@ -55,8 +59,10 @@ def handle_request(client_socket, client_address):
         content_length = int(headers.get("Content-Length", 0))
 
         if content_length > 0:
-            # Read the request body
+            print(f"Expecting {content_length} bytes of data from the body.")
+            # Read the request body (expecting the size of content-length)
             body = client_socket.recv(content_length).decode("utf-8")
+            print(f"Body received: {body}")
             
             try:
                 with open(f"{directory}/{filename}", "w") as f:
@@ -76,12 +82,15 @@ def handle_request(client_socket, client_address):
 
     # Send the response back to the client and ensure the connection is closed after
     print(f"Sending response: {response}")
-    client_socket.sendall(response)
-    client_socket.close()
-
+    try:
+        client_socket.sendall(response)
+        client_socket.close()
+    except Exception as e:
+        print(f"Error during sending response: {e}")
 
 def main():
     server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
+    print("Server is running...")
     while True:
         client_socket, client_address = server_socket.accept()  # wait for client
         threading.Thread(target=handle_request, args=(client_socket, client_address)).start()
