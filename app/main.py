@@ -8,8 +8,13 @@ def main():
     # Read the request from the client
     request = client_socket.recv(4096).decode("utf-8")
     client_data = request.split(" ")
-    if client_data[1] == "/":
+    target = client_data[1]
+    if target == "/":
         client_socket.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+    elif target.startswith("/echo/"):
+        value = target.split("/echo/")[1]
+        response = f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {len(value)}\r\n\r\n{value}".encode()
+        client_socket.sendall(response)
     else:
         client_socket.sendall(b"HTTP/1.1 404 Not Found\r\n\r\n")
 
