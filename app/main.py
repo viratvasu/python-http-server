@@ -10,13 +10,18 @@ def main():
     client_data = request.split(" ")
     target = client_data[1]
     if target == "/":
-        client_socket.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+        response = b"HTTP/1.1 200 OK\r\n\r\n"
     elif target.startswith("/echo/"):
         value = target.split("/echo/")[1]
         response = f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {len(value)}\r\n\r\n{value}".encode()
-        client_socket.sendall(response)
+    elif target.startswith("/user-agent"):
+        value=client_data[-1].strip()
+        response = f"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {len(value)}\r\n\r\n{value}".encode()
+        # response = b"HTTP/1.1 200 OK\r\n\r\n"
     else:
-        client_socket.sendall(b"HTTP/1.1 404 Not Found\r\n\r\n")
+        response=b"HTTP/1.1 404 Not Found\r\n\r\n"
+    
+    client_socket.sendall(response)
 
 
 if __name__ == "__main__":
