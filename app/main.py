@@ -15,7 +15,9 @@ def handle_request(client_socket, client_address):
         method, target, _ = request_line.split(" ")
     except ValueError:
         # In case the request line doesn't have the expected format
-        client_socket.sendall(b"HTTP/1.1 400 Bad Request\r\n\r\n")
+        response = b"HTTP/1.1 400 Bad Request\r\n\r\n"
+        client_socket.sendall(response)
+        client_socket.close()
         return
     
     # Extract headers (skip the empty lines at the end)
@@ -62,7 +64,9 @@ def handle_request(client_socket, client_address):
 
                 # Respond with HTTP 201 Created
                 response = b"HTTP/1.1 201 Created\r\n\r\n"
-            except Exception:
+            except Exception as e:
+                # Log exception to help debug
+                print(f"Error writing file: {e}")
                 response = b"HTTP/1.1 500 Internal Server Error\r\n\r\n"
         else:
             response = b"HTTP/1.1 400 Bad Request\r\n\r\n"
@@ -70,8 +74,10 @@ def handle_request(client_socket, client_address):
     else:
         response = b"HTTP/1.1 404 Not Found\r\n\r\n"
 
-    # Send the response back to the client
+    # Send the response back to the client and ensure the connection is closed after
+    print(f"Sending response: {response}")
     client_socket.sendall(response)
+    client_socket.close()
 
 
 def main():
