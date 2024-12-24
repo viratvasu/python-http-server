@@ -2,11 +2,14 @@ import threading
 import socket  # noqa: F401
 
 
+def handle_request(socket_conn, addr):
+    socket_conn.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
 def main():
     server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
     while True:
         client_socket, client_address = server_socket.accept() # wait for client
         print(f"Connection received from {client_address}")
+        threading.Thread(target=handle_request, args=(client_socket, client_address)).start()
         # Read the request from the client
         # request = client_socket.recv(4096).decode("utf-8")
         # client_data = request.split(" ")
@@ -22,8 +25,7 @@ def main():
         #     # response = b"HTTP/1.1 200 OK\r\n\r\n"
         # else:
             # response=b"HTTP/1.1 404 Not Found\r\n\r\n"
-        
-        client_socket.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+      
 
 
 if __name__ == "__main__":
