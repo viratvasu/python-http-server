@@ -2,13 +2,20 @@ import threading
 import socket
 import sys
 import os
+import gzip
+import io
+
+def compress_content(content):
+    out = io.BytesIO()
+    with gzip.GzipFile(fileobj=out, mode='w') as f:
+        f.write(content.encode())
+    return out.getvalue()
 
 def handle_request(client_socket, client_address):
     request = client_socket.recv(4096).decode("utf-8")
     request_lines = request.split('\r\n')
     
-    request_line = request_lines[0]
-    method, target, *_ = request_line.split()
+    method, target, *_ = request_lines[0].split()
     
     headers = {}
     current_line = 1
@@ -25,12 +32,16 @@ def handle_request(client_socket, client_address):
             value = target.split("/echo/")[1]
             response_headers = ["HTTP/1.1 200 OK", "Content-Type: text/plain"]
             
-            accept_encoding = headers.get('accept-encoding', '').lower()
-            if 'gzip' in accept_encoding:
-                response_headers.append("Content-Encoding: gzip")
-            
-            response_headers.append(f"Content-Length: {len(value)}")
-            response = f"{'\r\n'.join(response_headers)}\r\n\r\n{value}".encode()
+            if 'accept-encoding' in headers and 'gzip' in headers['accept-encoding'].lower():
+                compressed_body = compress_content(value)
+                response_headers.extend([
+                    "Content-Encoding: gzip",
+                    f"Content-Length: {len(compressed_body)}"
+                ])
+                response = f"{'\r\n'.join(response_headers)}\r\n\r\n".encode() + compressed_body
+            else:
+                response_headers.append(f"Content-Length: {len(value)}")
+                response = f"{'\r\n'.join(response_headers)}\r\n\r\n{value}".encode()
             
         elif target.startswith("/user-agent"):
             value = headers.get('user-agent', '')
